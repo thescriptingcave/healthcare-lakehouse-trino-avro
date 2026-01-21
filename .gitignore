@@ -1,0 +1,24 @@
+# --- Mac System Files ---
+.DS_Store
+
+# --- uv & Python ---
+.venv/
+.uv/
+__pycache__/
+*.py[cod]
+.python-version
+
+# --- Docker & Data (Crucial) ---
+# We ignore the actual data storage so your Git repo stays small.
+# These match the volume paths in your docker-compose.
+data/
+db_data/
+kafka_data/
+
+# --- Environment & Secrets ---
+.env
+*.log
+
+# --- Trino ---
+# We keep the configs, but ignore any temporary logs Trino creates
+trino/var/
