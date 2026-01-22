@@ -1,0 +1,10 @@
+{
+    "tableName": "patients",
+    "schemaName": "default",
+    "topicName": "healthcare.healthcare.patients",
+    "message": {
+        "dataFormat": "avro",
+        "avroSchemaUrl": "http://schema-registry:8081/subjects/healthcare.healthcare.patients-value/versions/latest/schema",
+        "fields": []
+    }
+}
