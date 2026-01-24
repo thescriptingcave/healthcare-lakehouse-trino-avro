@@ -1,24 +1,29 @@
-# --- Mac System Files ---
-.DS_Store
+# --- Database & Storage Persistence ---
+# These folders contain your actual data and should not be in version control
+mysql_data/
+minio-data/
 
-# --- uv & Python ---
-.venv/
-.uv/
-__pycache__/
-*.py[cod]
-.python-version
+# --- Trino Specifics ---
+# Trino generates logs and temporary files in its internal directory
+trino/var/
 
-# --- Docker & Data (Crucial) ---
-# We ignore the actual data storage so your Git repo stays small.
-# These match the volume paths in your docker-compose.
-data/
-db_data/
-kafka_data/
+# --- Superset Specifics ---
+# Local home directory for Superset configs and logs
+superset_home/
 
 # --- Environment & Secrets ---
+# If you eventually move passwords from docker-compose.yaml to an .env file
 .env
-*.log
 
-# --- Trino ---
-# We keep the configs, but ignore any temporary logs Trino creates
-trino/var/
+# --- Python & Avro Artifacts ---
+# For your healthcare Avro generation scripts and virtual environments
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+requirements-local.txt.bak
+
+# --- System & IDE ---
+.DS_Store
+.vscode/
+.idea/

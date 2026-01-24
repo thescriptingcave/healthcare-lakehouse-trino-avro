@@ -6,6 +6,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: healthcare
+    volumes:
+      - ./mysql_data:/var/lib/mysql  
     ports:
       - "3306:3306"
     networks:
@@ -42,6 +44,8 @@ services:
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
+    volumes:
+      - ./minio-data:/data  
     command: server --console-address ":9001" /data
     networks:
       - trino-network
@@ -70,7 +74,7 @@ services:
       echo 'Iceberg bucket created or already exists';
       "
 
-    # 4. Kafka stack
+  # 4. Kafka stack
   zookeeper:
     image: confluentinc/cp-zookeeper:7.4.0
     container_name: zookeeper
@@ -151,6 +155,30 @@ services:
       KAFKA_BROKERS: "kafka:29092"
       KAFKA_SCHEMAREGISTRY_ENABLED: "true"
       KAFKA_SCHEMAREGISTRY_URLS: "http://schema-registry:8081"
+
+  # 6. Superset (Visualization)
+  superset:
+   image: apache/superset:3.1.0
+   container_name: superset
+   user: "root"
+   depends_on:
+    trino:
+      condition: service_started
+   ports:
+    - "8088:8088"
+   networks:
+    - trino-network
+   environment:
+    SUPERSET_SECRET_KEY: healthcare_2026_secret
+    SUPERSET_WEBSERVER_PORT: 8088
+    SUPERSET_WEBSERVER_TIMEOUT: 300
+    SUPERSET_WEBSERVER_ROUTE_PREFIX: "/"
+   volumes:
+     # Mount docker/requirements-local.txt
+    - ./superset_home:/app/superset_home
+    - ./docker/requirements-local.txt:/app/requirements-local.txt
+   entrypoint: >
+      sh -c "pip install -r /app/requirements-local.txt && /usr/bin/run-server.sh" 
 
 networks:
   trino-network:
