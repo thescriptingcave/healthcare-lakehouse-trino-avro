@@ -1,0 +1,266 @@
+.
+├── avro-deserializer.py
+├── check_stock.py
+├── docker
+│   └── requirements-local.txt
+├── docker_produce_vitals_fix.py
+├── docker_produce_vitals.py
+├── docker-compose.yaml
+├── duckdb_ingestion_mysql_minio.sql
+├── fdny_firehouse_listing.csv
+├── generate_vitals.py
+├── init-scripts
+├── main.py
+├── minio-data
+│   ├── healthcare-avro
+│   └── icebergwarehouse
+├── msql8.txt
+├── mysql_data
+│   ├── #ib_16384_0.dblwr
+│   ├── #ib_16384_1.dblwr
+│   ├── #innodb_redo
+│   │   ├── #ib_redo31
+│   │   ├── #ib_redo32_tmp
+│   │   ├── #ib_redo33_tmp
+│   │   ├── #ib_redo34_tmp
+│   │   ├── #ib_redo35_tmp
+│   │   ├── #ib_redo36_tmp
+│   │   ├── #ib_redo37_tmp
+│   │   ├── #ib_redo38_tmp
+│   │   ├── #ib_redo39_tmp
+│   │   ├── #ib_redo40_tmp
+│   │   ├── #ib_redo41_tmp
+│   │   ├── #ib_redo42_tmp
+│   │   ├── #ib_redo43_tmp
+│   │   ├── #ib_redo44_tmp
+│   │   ├── #ib_redo45_tmp
+│   │   ├── #ib_redo46_tmp
+│   │   ├── #ib_redo47_tmp
+│   │   ├── #ib_redo48_tmp
+│   │   ├── #ib_redo49_tmp
+│   │   ├── #ib_redo50_tmp
+│   │   ├── #ib_redo51_tmp
+│   │   ├── #ib_redo52_tmp
+│   │   ├── #ib_redo53_tmp
+│   │   ├── #ib_redo54_tmp
+│   │   ├── #ib_redo55_tmp
+│   │   ├── #ib_redo56_tmp
+│   │   ├── #ib_redo57_tmp
+│   │   ├── #ib_redo58_tmp
+│   │   ├── #ib_redo59_tmp
+│   │   ├── #ib_redo60_tmp
+│   │   ├── #ib_redo61_tmp
+│   │   └── #ib_redo62_tmp
+│   ├── #innodb_temp
+│   │   ├── temp_1.ibt
+│   │   ├── temp_10.ibt
+│   │   ├── temp_2.ibt
+│   │   ├── temp_3.ibt
+│   │   ├── temp_4.ibt
+│   │   ├── temp_5.ibt
+│   │   ├── temp_6.ibt
+│   │   ├── temp_7.ibt
+│   │   ├── temp_8.ibt
+│   │   └── temp_9.ibt
+│   ├── auto.cnf
+│   ├── binlog.000001
+│   ├── binlog.000002
+│   ├── binlog.000003
+│   ├── binlog.000004
+│   ├── binlog.000005
+│   ├── binlog.000006
+│   ├── binlog.index
+│   ├── ca-key.pem
+│   ├── ca.pem
+│   ├── client-cert.pem
+│   ├── client-key.pem
+│   ├── healthcare
+│   │   ├── allergies.ibd
+│   │   ├── careplans.ibd
+│   │   ├── conditions.ibd
+│   │   ├── devices.ibd
+│   │   ├── encounters.ibd
+│   │   ├── imaging_studies.ibd
+│   │   ├── immunizations.ibd
+│   │   ├── medications.ibd
+│   │   ├── observations.ibd
+│   │   ├── organizations.ibd
+│   │   ├── patients.ibd
+│   │   ├── payer_transitions.ibd
+│   │   ├── payers.ibd
+│   │   ├── procedures.ibd
+│   │   └── providers.ibd
+│   ├── ib_buffer_pool
+│   ├── ibdata1
+│   ├── ibtmp1
+│   ├── mysql
+│   │   ├── general_log_213.sdi
+│   │   ├── general_log.CSM
+│   │   ├── general_log.CSV
+│   │   ├── slow_log_214.sdi
+│   │   ├── slow_log.CSM
+│   │   └── slow_log.CSV
+│   ├── mysql.ibd
+│   ├── mysql.sock -> /var/run/mysqld/mysqld.sock
+│   ├── performance_schema
+│   │   ├── accounts_145.sdi
+│   │   ├── binary_log_trans_189.sdi
+│   │   ├── cond_instances_82.sdi
+│   │   ├── data_lock_waits_161.sdi
+│   │   ├── data_locks_160.sdi
+│   │   ├── error_log_83.sdi
+│   │   ├── events_errors_su_139.sdi
+│   │   ├── events_errors_su_140.sdi
+│   │   ├── events_errors_su_141.sdi
+│   │   ├── events_errors_su_142.sdi
+│   │   ├── events_errors_su_143.sdi
+│   │   ├── events_stages_cu_111.sdi
+│   │   ├── events_stages_hi_112.sdi
+│   │   ├── events_stages_hi_113.sdi
+│   │   ├── events_stages_su_114.sdi
+│   │   ├── events_stages_su_115.sdi
+│   │   ├── events_stages_su_116.sdi
+│   │   ├── events_stages_su_117.sdi
+│   │   ├── events_stages_su_118.sdi
+│   │   ├── events_statement_119.sdi
+│   │   ├── events_statement_120.sdi
+│   │   ├── events_statement_121.sdi
+│   │   ├── events_statement_122.sdi
+│   │   ├── events_statement_123.sdi
+│   │   ├── events_statement_124.sdi
+│   │   ├── events_statement_125.sdi
+│   │   ├── events_statement_126.sdi
+│   │   ├── events_statement_127.sdi
+│   │   ├── events_statement_128.sdi
+│   │   ├── events_statement_129.sdi
+│   │   ├── events_statement_130.sdi
+│   │   ├── events_transacti_131.sdi
+│   │   ├── events_transacti_132.sdi
+│   │   ├── events_transacti_133.sdi
+│   │   ├── events_transacti_134.sdi
+│   │   ├── events_transacti_135.sdi
+│   │   ├── events_transacti_136.sdi
+│   │   ├── events_transacti_137.sdi
+│   │   ├── events_transacti_138.sdi
+│   │   ├── events_waits_cur_84.sdi
+│   │   ├── events_waits_his_85.sdi
+│   │   ├── events_waits_his_86.sdi
+│   │   ├── events_waits_sum_87.sdi
+│   │   ├── events_waits_sum_88.sdi
+│   │   ├── events_waits_sum_89.sdi
+│   │   ├── events_waits_sum_90.sdi
+│   │   ├── events_waits_sum_91.sdi
+│   │   ├── events_waits_sum_92.sdi
+│   │   ├── file_instances_93.sdi
+│   │   ├── file_summary_by__94.sdi
+│   │   ├── file_summary_by__95.sdi
+│   │   ├── global_status_181.sdi
+│   │   ├── global_variables_184.sdi
+│   │   ├── host_cache_96.sdi
+│   │   ├── hosts_146.sdi
+│   │   ├── keyring_componen_191.sdi
+│   │   ├── keyring_keys_152.sdi
+│   │   ├── log_status_174.sdi
+│   │   ├── memory_summary_b_154.sdi
+│   │   ├── memory_summary_b_155.sdi
+│   │   ├── memory_summary_b_156.sdi
+│   │   ├── memory_summary_b_157.sdi
+│   │   ├── memory_summary_g_153.sdi
+│   │   ├── metadata_locks_159.sdi
+│   │   ├── mutex_instances_97.sdi
+│   │   ├── objects_summary__98.sdi
+│   │   ├── performance_time_99.sdi
+│   │   ├── persisted_variab_187.sdi
+│   │   ├── prepared_stateme_175.sdi
+│   │   ├── processlist_100.sdi
+│   │   ├── replication_appl_165.sdi
+│   │   ├── replication_appl_166.sdi
+│   │   ├── replication_appl_167.sdi
+│   │   ├── replication_appl_168.sdi
+│   │   ├── replication_appl_170.sdi
+│   │   ├── replication_appl_171.sdi
+│   │   ├── replication_asyn_172.sdi
+│   │   ├── replication_asyn_173.sdi
+│   │   ├── replication_conn_162.sdi
+│   │   ├── replication_conn_164.sdi
+│   │   ├── replication_grou_163.sdi
+│   │   ├── replication_grou_169.sdi
+│   │   ├── rwlock_instances_101.sdi
+│   │   ├── session_account__151.sdi
+│   │   ├── session_connect__150.sdi
+│   │   ├── session_status_182.sdi
+│   │   ├── session_variable_185.sdi
+│   │   ├── setup_actors_102.sdi
+│   │   ├── setup_consumers_103.sdi
+│   │   ├── setup_instrument_104.sdi
+│   │   ├── setup_objects_105.sdi
+│   │   ├── setup_threads_106.sdi
+│   │   ├── socket_instances_147.sdi
+│   │   ├── socket_summary_b_148.sdi
+│   │   ├── socket_summary_b_149.sdi
+│   │   ├── status_by_accoun_177.sdi
+│   │   ├── status_by_host_178.sdi
+│   │   ├── status_by_thread_179.sdi
+│   │   ├── status_by_user_180.sdi
+│   │   ├── table_handles_158.sdi
+│   │   ├── table_io_waits_s_107.sdi
+│   │   ├── table_io_waits_s_108.sdi
+│   │   ├── table_lock_waits_109.sdi
+│   │   ├── threads_110.sdi
+│   │   ├── tls_channel_stat_190.sdi
+│   │   ├── user_defined_fun_188.sdi
+│   │   ├── user_variables_b_176.sdi
+│   │   ├── users_144.sdi
+│   │   ├── variables_by_thr_183.sdi
+│   │   └── variables_info_186.sdi
+│   ├── private_key.pem
+│   ├── public_key.pem
+│   ├── server-cert.pem
+│   ├── server-key.pem
+│   ├── sys
+│   │   └── sys_config.ibd
+│   ├── undo_001
+│   └── undo_002
+├── produce_vitals.py
+├── pyproject.toml
+├── README.md
+├── schema-viewer.py
+├── scripts
+│   └── migration
+│       ├── 01_setup_branch.sql
+│       ├── 02_migration_core.sql
+│       └── 03_validation.sql
+├── sql
+│   ├── healthcare_allergies.sql
+│   ├── healthcare_careplans.sql
+│   ├── healthcare_conditions.sql
+│   ├── healthcare_devices.sql
+│   ├── healthcare_encounters.sql
+│   ├── healthcare_imaging_studies.sql
+│   ├── healthcare_immunizations.sql
+│   ├── healthcare_medications.sql
+│   ├── healthcare_observations.sql
+│   ├── healthcare_organizations.sql
+│   ├── healthcare_patients.sql
+│   ├── healthcare_payer_transitions.sql
+│   ├── healthcare_payers.sql
+│   ├── healthcare_procedures.sql
+│   └── healthcare_providers.sql
+├── superset_home
+│   └── superset.db
+├── trino
+│   ├── catalog
+│   │   ├── hive.properties
+│   │   ├── kafka.properties
+│   │   ├── minio.properties
+│   │   ├── mysql.properties
+│   │   └── nessie.properties
+│   └── kafka
+│       ├── healthcare.patients.json
+│       └── vitals.json
+├── trino_kafka
+│   └── vitals.json
+├── trino.log
+└── uv.lock
+
+21 directories, 243 files

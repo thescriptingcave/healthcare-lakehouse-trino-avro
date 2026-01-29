@@ -125,6 +125,8 @@ services:
     image: trinodb/trino:latest
     container_name: trino
     depends_on:
+      kafka:
+        condition: service_healthy    
       db:
         condition: service_healthy
       nessie:
@@ -135,6 +137,8 @@ services:
       - "8082:8080"
     volumes:
       - ./trino/catalog:/etc/trino/catalog
+      - ./trino_kafka:/etc/trino/kafka
+
     networks:
       - trino-network
 
@@ -151,6 +155,9 @@ services:
       - "8080:8080"
     networks:
       - trino-network
+    links:
+      - kafka
+      - schema-registry  
     environment:
       KAFKA_BROKERS: "kafka:29092"
       KAFKA_SCHEMAREGISTRY_ENABLED: "true"

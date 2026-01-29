@@ -1,0 +1,8 @@
+{
+  "tableName": "patients",
+  "schemaName": "healthcare",
+  "topicName": "healthcare.healthcare.patients",
+  "value": {
+    "dataFormat": "avro"
+  }
+}

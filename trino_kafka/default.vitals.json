@@ -1,0 +1,40 @@
+{
+    "tableName": "vitals",
+    "schemaName": "default",
+    "topicName": "vitals",
+    "message": {
+        "dataFormat": "json",
+        "fields": [
+            {
+                "name": "patient_id",
+                "mapping": "patient_id",
+                "type": "VARCHAR"
+            },
+            {
+                "name": "heart_rate",
+                "mapping": "heart_rate",
+                "type": "INTEGER"
+            },
+            {
+                "name": "blood_pressure_systolic",
+                "mapping": "blood_pressure_systolic",
+                "type": "INTEGER"
+            },
+            {
+                "name": "blood_pressure_diastolic",
+                "mapping": "blood_pressure_diastolic",
+                "type": "INTEGER"
+            },
+            {
+                "name": "temperature",
+                "mapping": "temperature",
+                "type": "DOUBLE"
+            },
+            {
+                "name": "timestamp",
+                "mapping": "timestamp",
+                "type": "BIGINT"
+            }
+        ]
+    }
+}
