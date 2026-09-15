@@ -300,7 +300,7 @@ def verify_charts(token: str, charts: list[tuple[str, int, int]]) -> None:
             }
         ]
         if params["viz_type"] == "table":
-            queries[0]["columns"] = [c["column_name"] for c in params.get("all_columns", [])]
+            queries[0]["columns"] = params.get("all_columns", [])
             queries[0]["metrics"] = []
             queries[0]["groupby"] = []
         resp = api(
@@ -418,7 +418,7 @@ def main() -> None:
                 {
                     "viz_type": "table",
                     "all_columns": [
-                        c
+                        column_ref(c)
                         for c in cols
                         if c["column_name"] in ("patient_id", "first", "heart_rate", "timestamp")
                     ],
