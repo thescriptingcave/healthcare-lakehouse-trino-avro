@@ -270,7 +270,7 @@ def attach_charts(token: str, dash_id: int, charts: list[tuple[str, int, int]]) 
         f"/api/v1/dashboard/{dash_id}",
         json={
             "dashboard_title": DASHBOARD_TITLE,
-            "json_metadata": json.dumps({"positions": positions}),
+            "json_metadata": json.dumps({}),
             "position_json": json.dumps(positions),
         },
     )
