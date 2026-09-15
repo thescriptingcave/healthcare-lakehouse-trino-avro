@@ -1,11 +1,16 @@
 -- Demonstrate joining live Kafka data with MySQL patients
 -- This shows that you are merging a static database with a live message stream in real-time.
+-- Live vitals arrive on the `telemetry.vitals` Kafka topic (Avro, Schema Registry).
+-- The Trino Kafka connector auto-discovers the table from the Schema Registry
+-- subject (kafka.table-description-supplier=CONFLUENT), so no file-based table
+-- definition is needed.
 SELECT
     p.first AS name,
     p.last AS surname,
     v.heart_rate,
+    v.temperature,
     from_unixtime(v.timestamp / 1000) AS last_update
-FROM kafka.default.vitals v
+FROM kafka.default."telemetry.vitals" v
 JOIN mysql.healthcare.patients p ON v.patient_id = p.patient_id
 WHERE v.heart_rate > 100
 ORDER BY v.timestamp DESC
@@ -24,7 +29,7 @@ SELECT
     p.first,
     v.heart_rate,
     v.timestamp
-FROM kafka.default.vitals v
+FROM kafka.default."telemetry.vitals" v
 JOIN mysql.healthcare.patients p ON v.patient_id = p.patient_id
 WHERE v.heart_rate > 100;
 

@@ -2,7 +2,9 @@
 """
 Docker vitals producer with Avro serialization.
 
-Sends simulated patient vitals to Kafka using Docker internal hostnames.
+Identical to produce_vitals.py but defaults to Docker-internal hostnames, so it
+can be run from anywhere on the compose network.
+
 Use this script when running from within the Docker network.
 """
 
@@ -10,12 +12,16 @@ import logging
 import os
 import random
 import time
+from datetime import datetime
 from typing import Any
 
 from confluent_kafka import SerializingProducer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.serialization import StringSerializer
+
+from produce_vitals import VITALS_SCHEMA
+from producer import PATIENT_IDS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,20 +33,6 @@ logger = logging.getLogger(__name__)
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://schema-registry:8081")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "telemetry.vitals")
-
-# Avro schema for patient vitals
-VITALS_SCHEMA = """
-{
-    "namespace": "healthcare.analytics",
-    "type": "record",
-    "name": "Vitals",
-    "fields": [
-        {"name": "patient_id", "type": "int"},
-        {"name": "heart_rate", "type": "int"},
-        {"name": "timestamp", "type": "long"}
-    ]
-}
-"""
 
 
 def delivery_callback(err: Any, msg: Any) -> None:
@@ -84,12 +76,15 @@ def generate_vitals() -> dict[str, Any]:
     """Generate random patient vital signs data.
 
     Returns:
-        A dictionary containing patient_id, heart_rate, and timestamp.
+        A dictionary containing vitals for a patient in the mapped ID set.
     """
     return {
-        "patient_id": random.randint(1, 10),
-        "heart_rate": random.randint(60, 110),
-        "timestamp": int(time.time()),
+        "patient_id": random.choice(PATIENT_IDS),
+        "heart_rate": random.randint(60, 100),
+        "blood_pressure_systolic": random.randint(110, 140),
+        "blood_pressure_diastolic": random.randint(70, 90),
+        "temperature": round(random.uniform(36.5, 37.5), 1),
+        "timestamp": int(datetime.now().timestamp() * 1000),
     }
 
 
@@ -109,7 +104,7 @@ def run_producer() -> None:
             data = generate_vitals()
             producer.produce(
                 topic=KAFKA_TOPIC,
-                key=str(data["patient_id"]),
+                key=data["patient_id"],
                 value=data,
                 on_delivery=delivery_callback,
             )

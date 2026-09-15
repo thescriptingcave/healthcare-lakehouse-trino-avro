@@ -31,10 +31,10 @@ class TestGenerateVitals:
             assert result["patient_id"] in PATIENT_IDS
 
     def test_heart_rate_in_range(self) -> None:
-        """Heart rate should be between 60 and 100."""
+        """Heart rate should be between 60 and 120."""
         for _ in range(100):
             result = generate_vitals()
-            assert 60 <= result["heart_rate"] <= 100
+            assert 60 <= result["heart_rate"] <= 120
 
     def test_blood_pressure_ranges(self) -> None:
         """Blood pressure should be in plausible ranges."""

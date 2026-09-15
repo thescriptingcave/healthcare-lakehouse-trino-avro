@@ -4,6 +4,7 @@ minio-data/
 
 # --- Trino Specifics ---
 trino/var/
+trino/catalog/
 
 # --- Superset Specifics ---
 superset_home/

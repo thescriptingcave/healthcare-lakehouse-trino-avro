@@ -59,5 +59,51 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate docker-compose
-        run: docker compose config --quiet
+      - name: Validate docker-compose (default + CI override)
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yaml -f .github/ci-compose.yaml config --quiet
+
+  integration:
+    name: Integration (Docker Stack)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Prepare .env
+        run: cp .env.example .env
+      - name: Start core stack
+        run: docker compose -f docker-compose.yaml -f .github/ci-compose.yaml up -d --wait --wait-timeout 300 trino schema-registry
+      - name: Seed MySQL + enrich patient IDs
+        run: make seed
+      - name: Migrate MySQL -> Iceberg (Nessie/MinIO)
+        run: make migrate
+      - name: Produce Avro vitals
+        run: |
+          uv run python - <<'EOF'
+          import produce_vitals as pv
+          producer = pv.create_producer()
+          for _ in range(40):
+              producer.produce(topic=pv.KAFKA_TOPIC, value=pv.generate_vitals())
+              producer.poll(0)
+          producer.flush()
+          print("produced 40 Avro vitals to", pv.KAFKA_TOPIC)
+          EOF
+      - name: Verify federated join (Kafka Avro <> MySQL)
+        run: |
+          total=$(docker exec trino trino --execute 'SELECT count(*) FROM kafka.default."telemetry.vitals"' --output-format TSV 2>/dev/null | grep -E '^[0-9]+$' | head -1)
+          joined=$(docker exec trino trino --execute 'SELECT count(*) FROM kafka.default."telemetry.vitals" v JOIN mysql.healthcare.patients p ON v.patient_id = p.patient_id' --output-format TSV 2>/dev/null | grep -E '^[0-9]+$' | head -1)
+          high=$(docker exec trino trino --execute 'SELECT count(*) FROM kafka.default."telemetry.vitals" WHERE heart_rate > 100' --output-format TSV 2>/dev/null | grep -E '^[0-9]+$' | head -1)
+          echo "total=$total joined=$joined high=$high"
+          test -n "$total" && test "$total" -gt 0
+          test "$joined" = "$total"
+          test "$high" -gt 0
+      - name: Run live demo (Kafka join + Iceberg archive)
+        run: docker exec -i trino trino < demo_script/demo_script.sql
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.yaml -f .github/ci-compose.yaml down -v

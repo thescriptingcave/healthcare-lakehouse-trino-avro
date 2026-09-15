@@ -1,0 +1,8 @@
+# CI override: keep the heavyweight UI services out of the integration run.
+# The core data services (db, zookeeper, kafka, schema-registry, minio, nessie,
+# trino) all get pulled in automatically via the trino service's depends_on.
+services:
+  redpanda-console:
+    profiles: ["ci-skip"]
+  superset:
+    profiles: ["ci-skip"]

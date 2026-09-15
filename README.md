@@ -26,7 +26,7 @@ make migrate          # prints Iceberg vs MySQL counts at the end
 make validate         # optional: re-run the parity check
 
 # 4. Start the live vitals stream (leave this running in its own terminal)
-uv run producer.py
+make produce
 
 # 5. Run the federated demo (Kafka <> MySQL <> Iceberg in one query)
 docker exec -i trino trino < demo_script/demo_script.sql
@@ -37,9 +37,10 @@ If step 5 prints patient names next to heart-rate values, the pipeline works.
 **What just happened, in one sentence per step:**
 `make seed` loads the patient/encounter/observation data and adds a `patient_id`
 column so Kafka records can be matched; `make migrate` snapshots those tables as
-AVRO Iceberg tables in MinIO (versioned by Nessie); `producer.py` streams JSON
-vitals into the `vitals` Kafka topic; and `demo_script.sql` joins the live stream
-against MySQL then freezes high-heart-rate rows into an Iceberg archive table.
+AVRO Iceberg tables in MinIO (versioned by Nessie); `make produce` streams Avro
+vitals (validated against the Schema Registry) into the `telemetry.vitals`
+topic; and `demo_script.sql` joins the live stream against MySQL then freezes
+high-heart-rate rows into an Iceberg archive table.
 
 ---
 
@@ -120,17 +121,19 @@ The final lines should show matching counts, e.g.
 
 ```bash
 make produce
-# Or: uv run producer.py
+# Or: uv run produce_vitals.py
 ```
 
-The producer sends JSON records to the `vitals` Kafka topic. Patient IDs are
-drawn from the set populated by `make seed`, so every record joins to a row in
-the MySQL `patients` table.
+The producer serializes records with Avro, validates them against the Confluent
+Schema Registry, and sends them to the `telemetry.vitals` Kafka topic. Patient
+IDs are drawn from the set populated by `make seed` (e.g. `P1001`), so every
+record joins to a row in the MySQL `patients` table. Trino auto-discovers the
+Avro table from the Schema Registry subject via the Kafka connector's CONFLUENT
+supplier.
 
-> For the Avro / Schema Registry variant, run `uv run produce_vitals.py` — it
-> publishes to the separate `telemetry.vitals` topic (integer patient IDs). Trino
-> cannot decode those messages through the JSON `kafka.default.vitals` table, so
-> the federated demo below uses the JSON topic.
+> For a plain-JSON variant without Schema Registry, run `make produce-json`
+> (`uv run producer.py`) — it publishes to the separate `vitals` topic. Querying
+> that topic still works, but the demo below targets the Avro table.
 
 ### 5. Run the federated demo
 
@@ -148,8 +151,9 @@ SELECT
     p.first AS name,
     p.last AS surname,
     v.heart_rate,
+    v.temperature,
     from_unixtime(v.timestamp / 1000) AS last_update
-FROM kafka.default.vitals v
+FROM kafka.default."telemetry.vitals" v
 JOIN mysql.healthcare.patients p ON v.patient_id = p.patient_id
 WHERE v.heart_rate > 100
 ORDER BY v.timestamp DESC
@@ -174,8 +178,8 @@ make down          # Stop all services
 make status        # Show service status
 make check         # Run health checks
 make seed          # Seed MySQL (15 tables) + apply V2 enrichment
-make produce       # Start JSON vitals producer (used by the demo)
-make produce-avro  # Start Avro vitals producer (telemetry.vitals topic)
+make produce        # Start Avro vitals producer (primary, telemetry.vitals topic)
+make produce-json   # Start JSON vitals producer (alternative, vitals topic)
 make docker-produce # Start Avro vitals producer against the compose stack
 make migrate       # MySQL -> Iceberg (AVRO) in Nessie/MinIO + parity check
 make validate      # Re-run the data parity check
@@ -192,19 +196,15 @@ make clean         # Remove containers, volumes, and data
 ├── pyproject.toml               # Python project config
 ├── Makefile                     # Common operations
 ├── .env.example                 # Environment variable template
-├── main.py                      # CSV loader (FDNY -> Trino/Parquet)
 ├── produce_vitals.py            # Kafka vitals producer (Avro, local)
 ├── docker_produce_vitals.py     # Kafka vitals producer (Avro, Docker)
-├── producer.py                  # Kafka vitals producer (JSON, used by demo)
-├── generate_vitals.py           # Offline Avro file writer
-├── avro_deserializer.py         # Kafka Avro consumer utility
-├── schema_viewer.py             # Schema Registry viewer
+├── producer.py                  # Kafka vitals producer (JSON, alternative)
 ├── check_stock.py               # Stack health checker
 ├── sql/                         # MySQL seed data (15 tables)
 ├── scripts/migration/           # Trino migration SQL
 ├── demo_script/                 # Demo queries
-├── trino/catalog/               # Trino connector configs
-├── trino_kafka/                 # Kafka table definitions
+├── trino/catalog-templates/     # Trino catalog config templates (rendered via .env)
+├── docker/trino-bootstrap.sh    # Renders catalog templates at container start
 └── tests/                       # Unit tests
 ```
 
@@ -234,8 +234,8 @@ The healthcare database contains 15 clinical tables based on the Synthea open da
 
 | Topic | Format | Description |
 |-------|--------|-------------|
-| `vitals` | JSON | Real-time patient vitals (used by the demo; joins MySQL by `patient_id` string) |
-| `telemetry.vitals` | Avro | Experimental Avro vitals stream (integer patient IDs, Schema Registry) |
+| `telemetry.vitals` | Avro | Real-time patient vitals (primary demo stream; Schema Registry, joins MySQL by `patient_id` string) |
+| `vitals` | JSON | Plain-JSON alternative (no Schema Registry; `make produce-json`) |
 
 ## Development
 
@@ -285,17 +285,20 @@ lsof -i :3306 -i :9092 -i :8081 -i :8082 -i :19120
 
 - Ensure MySQL healthcheck passes: `docker compose ps db`
 - Wait for MySQL to be fully initialized (first run takes ~30s)
-- Check Trino MySQL catalog: `trino/catalog/mysql.properties`
+- Check Trino MySQL catalog: `trino/catalog-templates/mysql.properties.tmpl`
 
 ### Kafka topic not found
 
 - Ensure Kafka is healthy: `docker compose ps kafka`
-- Create the topic manually:
+- The `telemetry.vitals` topic is created automatically by the Avro producer (and
+  its Schema Registry subject) on first send. To recreate a clean topic after a
+  schema change, delete the topic and its subject:
   ```bash
   docker exec kafka kafka-topics --bootstrap-server localhost:29092 \
-    --create --topic telemetry.vitals --partitions 1 --replication-factor 1
+    --delete --topic telemetry.vitals
+  docker exec schema-registry curl -X DELETE "http://localhost:8081/subjects/telemetry.vitals-value?permanent=true"
   ```
-- The JSON `vitals` topic is created automatically by the producer on first send.
+- The JSON `vitals` topic is created automatically by `producer.py` on first send.
 
 ### Federated join returns no rows
 
@@ -304,7 +307,7 @@ lsof -i :3306 -i :9092 -i :8081 -i :8082 -i :19120
 - Fixes:
   ```bash
   make seed    # re-applies the V2 enrichment (idempotent)
-  uv run producer.py   # then re-run the demo query
+  make produce # then re-run the demo query
   ```
 - Verify the mapping landed: `SELECT patient_id, first, last FROM
   mysql.healthcare.patients WHERE patient_id IS NOT NULL;`

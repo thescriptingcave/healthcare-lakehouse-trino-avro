@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock
 
 from docker_produce_vitals import VITALS_SCHEMA, delivery_callback, generate_vitals
+from producer import PATIENT_IDS
 
 
 class TestGenerateVitals:
@@ -20,17 +21,32 @@ class TestGenerateVitals:
         assert "heart_rate" in result
         assert "timestamp" in result
 
-    def test_patient_id_in_range(self) -> None:
-        """Patient ID should be between 1 and 10."""
+    def test_patient_id_in_mapped_set(self) -> None:
+        """Patient ID should be a P#### string from the mapped Synthea set."""
         for _ in range(100):
             result = generate_vitals()
-            assert 1 <= result["patient_id"] <= 10
+            assert isinstance(result["patient_id"], str)
+            assert result["patient_id"] in PATIENT_IDS
 
     def test_heart_rate_in_range(self) -> None:
-        """Heart rate should be between 60 and 110."""
+        """Heart rate should be between 60 and 120."""
         for _ in range(100):
             result = generate_vitals()
-            assert 60 <= result["heart_rate"] <= 110
+            assert 60 <= result["heart_rate"] <= 120
+
+    def test_blood_pressure_in_range(self) -> None:
+        """Blood pressure values should be within normal ranges."""
+        for _ in range(100):
+            result = generate_vitals()
+            assert 110 <= result["blood_pressure_systolic"] <= 140
+            assert 70 <= result["blood_pressure_diastolic"] <= 90
+
+    def test_temperature_in_range(self) -> None:
+        """Temperature should be a float around normal body temperature."""
+        for _ in range(100):
+            result = generate_vitals()
+            assert isinstance(result["temperature"], float)
+            assert 36.5 <= result["temperature"] <= 37.5
 
 
 class TestDeliveryCallback:

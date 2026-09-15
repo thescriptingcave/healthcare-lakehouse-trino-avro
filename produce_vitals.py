@@ -3,18 +3,25 @@
 Kafka vitals producer with Avro serialization.
 
 Sends simulated patient vitals to Kafka with Schema Registry validation.
-Supports both local and Docker environments via environment variables.
+Patient IDs are drawn from the set populated by the V2__enrich_patients_for_kafka
+migration, so every record joins to a row in the MySQL `patients` table (the
+Trino federated join reads this topic via `kafka.default."telemetry.vitals"`).
+
+For the plain-JSON variant, see producer.py.
 """
 
 import logging
 import os
 import random
 import time
+from datetime import datetime
 from typing import Any
 
 from confluent_kafka import SerializingProducer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroSerializer
+
+from producer import PATIENT_IDS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,15 +34,20 @@ KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "telemetry.vitals")
 
-# Avro schema for patient vitals
+# Avro schema for patient vitals. Trino auto-discovers this schema from the
+# Schema Registry subject (kafka.table-description-supplier=CONFLUENT), so the
+# columns exposed to Trino match this definition exactly.
 VITALS_SCHEMA = """
 {
     "namespace": "healthcare.analytics",
     "type": "record",
     "name": "Vitals",
     "fields": [
-        {"name": "patient_id", "type": "int"},
+        {"name": "patient_id", "type": "string"},
         {"name": "heart_rate", "type": "int"},
+        {"name": "blood_pressure_systolic", "type": "int"},
+        {"name": "blood_pressure_diastolic", "type": "int"},
+        {"name": "temperature", "type": "double"},
         {"name": "timestamp", "type": "long"}
     ]
 }
@@ -81,12 +93,15 @@ def generate_vitals() -> dict[str, Any]:
     """Generate random patient vital signs data.
 
     Returns:
-        A dictionary containing patient_id, heart_rate, and timestamp.
+        A dictionary containing vitals for a patient in the mapped ID set.
     """
     return {
-        "patient_id": random.randint(1, 10),
+        "patient_id": random.choice(PATIENT_IDS),
         "heart_rate": random.randint(60, 120),
-        "timestamp": int(time.time()),
+        "blood_pressure_systolic": random.randint(110, 140),
+        "blood_pressure_diastolic": random.randint(70, 90),
+        "temperature": round(random.uniform(36.5, 37.5), 1),
+        "timestamp": int(datetime.now().timestamp() * 1000),
     }
 
 

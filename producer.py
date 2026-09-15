@@ -47,7 +47,7 @@ def generate_vitals() -> dict[str, Any]:
     """
     return {
         "patient_id": random.choice(PATIENT_IDS),
-        "heart_rate": random.randint(60, 100),
+        "heart_rate": random.randint(60, 120),
         "blood_pressure_systolic": random.randint(110, 140),
         "blood_pressure_diastolic": random.randint(70, 90),
         "temperature": round(random.uniform(36.5, 37.5), 1),

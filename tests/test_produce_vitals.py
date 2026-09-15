@@ -4,6 +4,7 @@ import time
 from unittest.mock import MagicMock
 
 from produce_vitals import VITALS_SCHEMA, delivery_callback, generate_vitals
+from producer import PATIENT_IDS
 
 
 class TestGenerateVitals:
@@ -21,11 +22,12 @@ class TestGenerateVitals:
         assert "heart_rate" in result
         assert "timestamp" in result
 
-    def test_patient_id_in_range(self) -> None:
-        """Patient ID should be between 1 and 10."""
+    def test_patient_id_in_mapped_set(self) -> None:
+        """Patient ID should be a P#### string from the mapped Synthea set."""
         for _ in range(100):
             result = generate_vitals()
-            assert 1 <= result["patient_id"] <= 10
+            assert isinstance(result["patient_id"], str)
+            assert result["patient_id"] in PATIENT_IDS
 
     def test_heart_rate_in_range(self) -> None:
         """Heart rate should be between 60 and 120."""
@@ -33,12 +35,26 @@ class TestGenerateVitals:
             result = generate_vitals()
             assert 60 <= result["heart_rate"] <= 120
 
-    def test_timestamp_is_epoch(self) -> None:
-        """Timestamp should be a reasonable epoch time."""
+    def test_blood_pressure_in_range(self) -> None:
+        """Blood pressure values should be within normal ranges."""
+        for _ in range(100):
+            result = generate_vitals()
+            assert 110 <= result["blood_pressure_systolic"] <= 140
+            assert 70 <= result["blood_pressure_diastolic"] <= 90
+
+    def test_temperature_in_range(self) -> None:
+        """Temperature should be a float around normal body temperature."""
+        for _ in range(100):
+            result = generate_vitals()
+            assert isinstance(result["temperature"], float)
+            assert 36.5 <= result["temperature"] <= 37.5
+
+    def test_timestamp_is_epoch_ms(self) -> None:
+        """Timestamp should be a reasonable epoch time in milliseconds."""
         result = generate_vitals()
-        now = time.time()
-        # Should be within 5 seconds of now
-        assert abs(result["timestamp"] - now) < 5
+        now = time.time() * 1000
+        # Should be within 5 seconds (5000 ms) of now
+        assert abs(result["timestamp"] - now) < 5000
 
     def test_timestamp_is_int(self) -> None:
         """Timestamp should be an integer."""
@@ -79,11 +95,14 @@ class TestVitalsSchema:
         assert "fields" in parsed
 
     def test_schema_has_required_fields(self) -> None:
-        """Schema should define patient_id, heart_rate, and timestamp."""
+        """Schema should define all vitals fields."""
         import json
 
         parsed = json.loads(VITALS_SCHEMA)
         field_names = [f["name"] for f in parsed["fields"]]
         assert "patient_id" in field_names
         assert "heart_rate" in field_names
+        assert "blood_pressure_systolic" in field_names
+        assert "blood_pressure_diastolic" in field_names
+        assert "temperature" in field_names
         assert "timestamp" in field_names

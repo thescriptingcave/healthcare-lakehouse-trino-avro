@@ -1,4 +1,4 @@
-.PHONY: help up down status check seed produce produce-avro docker-produce migrate validate test lint clean
+.PHONY: help up down status check seed produce produce-json docker-produce migrate validate test lint clean
 
 # Use uv to run Python commands against the project virtualenv
 PYTHON := uv run python
@@ -47,11 +47,11 @@ seed: ## Seed MySQL with healthcare data + apply V2 enrichment
 	@docker exec -i db mysql -u root -p$${MYSQL_ROOT_PASSWORD:-rootpassword} healthcare < scripts/migration/V2__enrich_patients_for_kafka.sql 2>/dev/null
 	@echo "Seeding complete."
 
-produce: ## Start the JSON vitals producer (used by the demo)
-	$(PYTHON) producer.py
-
-produce-avro: ## Start the Avro vitals producer (local, telemetry.vitals topic)
+produce: ## Start the Avro vitals producer (local, telemetry.vitals topic)
 	$(PYTHON) produce_vitals.py
+
+produce-json: ## Start the JSON vitals producer (alternative, vitals topic)
+	$(PYTHON) producer.py
 
 docker-produce: ## Start the Avro vitals producer against the compose stack
 	KAFKA_BOOTSTRAP_SERVERS=localhost:9092 SCHEMA_REGISTRY_URL=http://localhost:8081 $(PYTHON) docker_produce_vitals.py

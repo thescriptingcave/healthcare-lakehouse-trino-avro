@@ -150,11 +150,21 @@ services:
         condition: service_healthy
       createbuckets:
         condition: service_completed_successfully
+    environment:
+      MYSQL_ROOT_USER: ${MYSQL_ROOT_USER:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+    entrypoint: ["/bin/bash", "-c"]
+    # Render catalog templates (catalog files are written from .env values at
+    # container start - see docker/trino-bootstrap.sh), then launch Trino.
+    command:
+      - /bin/bash /etc/trino/bootstrap.sh && exec /usr/lib/trino/bin/run-trino
     ports:
       - "127.0.0.1:8082:8080"
     volumes:
-      - ./trino/catalog:/etc/trino/catalog
-      - ./trino_kafka:/etc/trino/kafka
+      - ./trino/catalog-templates:/etc/trino/templates:ro
+      - ./docker/trino-bootstrap.sh:/etc/trino/bootstrap.sh:ro
     networks:
       - trino-network
     healthcheck:
