@@ -250,6 +250,22 @@ observations, high heart-rate archive), four example charts, and the
 Then open http://localhost:8088 and log in with the admin credentials from
 `.env` (default `admin`/`admin`).
 
+### 7. Learn SQL on the live stack
+
+A four-part tutorial series (`tutorials/`) teaches time-series SQL, CTEs, and
+window functions against the real data, framed as business questions an analyst
+would receive. Every query executes live against the federated stack.
+
+```bash
+make tutorial TUT=01   # time-series basics & CTEs
+make tutorial TUT=02   # window functions (row_number, lag, rolling averages)
+make tutorial TUT=03   # monthly buckets, running totals, year-over-year
+make tutorial TUT=04   # federated real-time alerts (Kafka + MySQL + Iceberg)
+```
+
+See `tutorials/README.md` for the data model, the learning path, and Superset
+exercises.
+
 ## Available Make Targets
 
 ```bash
@@ -265,6 +281,7 @@ make docker-produce # Start Avro vitals producer against the compose stack
 make migrate       # MySQL -> Iceberg (AVRO) in Nessie/MinIO + parity check
 make validate      # Re-run the data parity check
 make superset-setup # Provision Superset dashboards (idempotent)
+make tutorial       # Run a SQL tutorial (usage: make tutorial TUT=01)
 make test          # Run unit tests
 make lint          # Run linter and formatter
 make clean         # Remove containers, volumes, and data

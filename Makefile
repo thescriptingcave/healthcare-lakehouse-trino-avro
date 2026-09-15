@@ -1,4 +1,4 @@
-.PHONY: help up down down-clean status check logs seed produce produce-json docker-produce migrate validate superset-setup test test-unit test-integration lint lint-fix typecheck clean setup
+.PHONY: help up down down-clean status check logs seed produce produce-json docker-produce migrate validate superset-setup tutorial test test-unit test-integration lint lint-fix typecheck clean setup
 
 # Use uv to run Python commands against the project virtualenv
 PYTHON := uv run python
@@ -70,6 +70,13 @@ validate: ## Run data validation queries
 
 superset-setup: ## Provision Superset databases, datasets, charts, dashboard
 	$(PYTHON) scripts/setup_superset.py
+
+tutorial: ## Run a SQL tutorial (usage: make tutorial TUT=01)
+	@if [ -z "$(TUT)" ]; then \
+		echo "Usage: make tutorial TUT=01  (01..04)"; \
+		exit 1; \
+	fi
+	docker exec -i trino trino < tutorials/$(TUT)*.sql
 
 test: ## Run unit tests
 	$(PYTHON) -m pytest tests/ -v
