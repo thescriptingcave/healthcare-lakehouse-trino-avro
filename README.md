@@ -46,31 +46,102 @@ high-heart-rate rows into an Iceberg archive table.
 
 ## Architecture
 
+This demo has **two distinct data paths** that share the same Trino query engine.
+Understanding the difference is key.
+
 ```
-┌─────────────┐     ┌──────────────┐     ┌───────────────┐
-│   MySQL 8   │────▶│    Trino     │────▶│   Superset    │
-│  (Clinical) │     │  (Federated  │     │(Visualization)│
-└─────────────┘     │   Queries)   │     └───────────────┘
-                    └──────┬───────┘
-                           │
-┌─────────────┐     ┌──────▼───────┐     ┌───────────────┐
-│    Kafka    │────▶│     Nessie   │────▶│     MinIO     │
-│   (vitals)  │     │  + Iceberg   │     │  (S3 Storage) │
-└─────────────┘     └──────────────┘     └───────────────┘
+                          ┌──────────────────────────────────────────────────┐
+                          │              TRINO (query engine)                │
+                          │    federated queries across all sources at once   │
+                          └───┬───────────────┬──────────────────┬───────────┘
+                              │               │                  │
+                  ┌───────────▼──┐   ┌────────▼────────┐   ┌───▼───────────┐
+                  │    MySQL 8   │   │      Kafka       │   │ Iceberg/Nessie│
+                  │ (source of  │   │ (live vitals     │   │ (persistent   │
+                  │  truth for  │   │  stream, Avro    │   │  lakehouse    │
+                  │  clinical   │   │  + Schema Reg.)  │   │  in MinIO)    │
+                  │  data)      │   │                  │   │               │
+                  └──────┬──────┘   └──────┬───────────┘   └───────────────┘
+                         │                 │
+                  Synthea CSV          Python producer
+                  (seeded via          (make produce)
+                   make seed)
 ```
+
+### Path 1: Batch — Clinical data (MySQL → Iceberg)
+
+The clinical data is static — it doesn't change at runtime. It's loaded once
+from Synthea-generated CSV files into MySQL (15 tables, ~250,000 records), then
+**copied** into Iceberg/MinIO via Trino so it lives in an open, queryable
+lakehouse format:
+
+```
+Synthea CSV → make seed (MySQL) → make migrate (Trino → Iceberg/Nessie/MinIO)
+```
+
+- **MySQL** holds the authoritative copy (`mysql.healthcare.*`).
+- **Iceberg** is a second copy in open format (`nessie.healthcare.*`), versioned
+  by Nessie so you can roll back or branch like Git.
+- `make validate` checks that the two copies have identical row counts.
+
+### Path 2: Streaming — Live vitals (Kafka)
+
+The vitals producer runs as a long-lived process, generating ~1 synthetic
+vitals message per second into Kafka's `telemetry.vitals` topic. Each message
+is Avro-encoded and validated against the Confluent Schema Registry before
+it's published.
+
+```
+make produce → Avro + Schema Registry → Kafka topic "telemetry.vitals"
+```
+
+- **Kafka retains messages for a limited window** (default ~7 days). After
+  that, messages are deleted automatically. The data is real but ephemeral.
+- Trino reads the topic **live at query time** — it does not copy the data
+  anywhere. Each query decodes the latest messages from Kafka's log.
+- Schema Registry ensures every message conforms to the Avro schema (string
+  `patient_id`, int `heart_rate`, etc.), so Trino always sees consistent columns.
+
+### Where they meet: The federated join
+
+The demo's key trick is a **single SQL query that spans both paths**:
+
+```sql
+SELECT p.first, v.heart_rate, from_unixtime(v.timestamp / 1000)
+FROM kafka.default."telemetry.vitals" v          -- live stream (ephemeral)
+JOIN mysql.healthcare.patients p ON v.patient_id = p.patient_id  -- clinical (permanent)
+```
+
+Trino executes this as one query across two completely separate systems:
+it reads the Kafka topic in real time while looking up patient names in
+MySQL. No ETL, no data movement — just SQL.
+
+### Why the Iceberg archive exists
+
+Because Kafka data is temporary, the demo archives the interesting subset
+(high heart rate) into an Iceberg table:
+
+```
+federated join WHERE heart_rate > 100 → nessie.clinical_archive.high_vitals_history
+```
+
+This is the **"freeze"** step: a live-stream query result is persisted into
+the lakehouse as an Iceberg table, where it's queryable forever and versioned
+by Nessie. In a real system, this is how you'd build a historical analytics
+layer on top of a streaming pipeline.
 
 ### Components
 
-| Service | Port | Purpose |
-|---------|------|---------|
-| MySQL 8.0 | 3306 | Source clinical database (patients, encounters, medications, etc.) |
+| Service | Port | Role |
+|---------|------|------|
+| MySQL 8.0 | 3306 | Source clinical database (patients, encounters, medications, observations, etc.) |
+| Kafka | 9092/29092 | Streaming platform — holds the live vitals topic |
+| Schema Registry | 8081 | Avro schema validation for Kafka messages |
+| Trino | 8082 | Distributed SQL — federates queries across MySQL, Kafka, and Iceberg |
 | Nessie | 19120 | Git-like catalog for Iceberg schema versioning |
-| MinIO | 9000/9001 | S3-compatible object storage for Iceberg tables |
-| Kafka | 9092/29092 | Streaming platform for real-time patient vitals |
-| Schema Registry | 8081 | Avro schema management for Kafka topics |
-| Trino | 8082 | Distributed SQL query engine for federated queries |
-| Redpanda Console | 8080 | Web UI for Kafka topics and messages |
+| MinIO | 9000/9001 | S3-compatible object storage (Iceberg tables live here) |
 | Apache Superset | 8088 | Data visualization and dashboards |
+| Redpanda Console | 8080 | Web UI for browsing Kafka topics and messages |
 
 ## Prerequisites
 
