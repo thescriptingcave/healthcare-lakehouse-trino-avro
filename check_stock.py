@@ -1,37 +1,83 @@
+#!/usr/bin/env python3
+"""
+Stack health check utility.
+
+Verifies connectivity to all services in the healthcare lakehouse stack.
+"""
+
+import logging
+import os
+import sys
+
 import requests
-import json
 
-def check_health():
-    print("🏥 Starting Healthcare Stack Health Check...\n")
-    
-    # 1. Check Schema Registry (Crucial for Avro)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+# Configuration from environment or defaults
+SCHEMA_REGISTRY_URL = os.getenv("SCHEMA_REGISTRY_URL", "http://localhost:8081")
+NESSIE_URL = os.getenv("NESSIE_URL", "http://localhost:19120")
+KAFKA_UI_URL = os.getenv("KAFKA_UI_URL", "http://localhost:8080")
+TRINO_URL = os.getenv("TRINO_URL", "http://localhost:8082")
+SUPerset_URL = os.getenv("SUPERSET_URL", "http://localhost:8088")
+
+
+def check_service(name: str, url: str, timeout: int = 5) -> bool:
+    """Check if a service is healthy.
+
+    Args:
+        name: Display name of the service.
+        url: Health check URL.
+        timeout: Request timeout in seconds.
+
+    Returns:
+        True if the service is healthy, False otherwise.
+    """
     try:
-        sr_response = requests.get("http://localhost:8081/subjects")
-        if sr_response.status_code == 200:
-            print("✅ [Schema Registry]: Online and ready for Avro schemas.")
-        else:
-            print("⚠️ [Schema Registry]: Online but returned status:", sr_response.status_code)
-    except Exception as e:
-        print("❌ [Schema Registry]: Unreachable. Ensure container 'schema-registry' is running.")
+        response = requests.get(url, timeout=timeout)
+        if response.status_code == 200:
+            logger.info("[OK]      %s is online", name)
+            return True
+        logger.warning("[WARN]    %s returned status %d", name, response.status_code)
+        return False
+    except requests.RequestException:
+        logger.error("[FAIL]    %s is unreachable at %s", name, url)
+        return False
 
-    # 2. Check Nessie (The Metadata Map)
-    try:
-        nessie_response = requests.get("http://localhost:19120/api/v1/config")
-        if nessie_response.status_code == 200:
-            print("✅ [Nessie]: Catalog REST API is responding.")
-    except Exception as e:
-        print("❌ [Nessie]: Unreachable. Check the 'nessie' container.")
 
-    # 3. Check Kafka UI (Redpanda Console)
-    try:
-        ui_response = requests.get("http://localhost:8080/health")
-        if ui_response.status_code == 200:
-            print("✅ [Kafka UI]: Redpanda Console is active at http://localhost:8080")
-    except Exception as e:
-        # Redpanda console might not have a /health endpoint, checking status code 200 on root
-        print("ℹ️  [Kafka UI]: Check http://localhost:8080 manually to view topics.")
+def run_health_checks() -> bool:
+    """Run health checks on all stack services.
 
-    print("\n🚀 If all checks passed, we are ready to stream Avro data.")
+    Returns:
+        True if all critical services are healthy.
+    """
+    logger.info("Starting Healthcare Stack Health Check...")
+    logger.info("")
+
+    results = [
+        check_service("Schema Registry", f"{SCHEMA_REGISTRY_URL}/subjects"),
+        check_service("Nessie", f"{NESSIE_URL}/api/v1/config"),
+        check_service("Kafka UI", KAFKA_UI_URL),
+        check_service("Trino", f"{TRINO_URL}/v1/info"),
+        check_service("Superset", f"{SUPerset_URL}/health"),
+    ]
+
+    logger.info("")
+    if all(results):
+        logger.info("All services are healthy. Ready to stream data.")
+        return True
+    logger.warning("Some services are not healthy. Check the logs above.")
+    return False
+
+
+def main() -> None:
+    """Main entry point."""
+    healthy = run_health_checks()
+    sys.exit(0 if healthy else 1)
+
 
 if __name__ == "__main__":
-    check_health()
+    main()
