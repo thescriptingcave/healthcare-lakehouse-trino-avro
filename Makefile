@@ -1,4 +1,4 @@
-.PHONY: help up down status check seed produce produce-json docker-produce migrate validate test lint clean
+.PHONY: help up down down-clean status check logs seed produce produce-json docker-produce migrate validate superset-setup test test-unit test-integration lint lint-fix typecheck clean setup
 
 # Use uv to run Python commands against the project virtualenv
 PYTHON := uv run python
@@ -67,6 +67,9 @@ migrate: ## Run Trino migration scripts
 validate: ## Run data validation queries
 	@echo "Running validation..."
 	@docker exec -i trino trino < scripts/migration/03_validation.sql
+
+superset-setup: ## Provision Superset databases, datasets, charts, dashboard
+	$(PYTHON) scripts/setup_superset.py
 
 test: ## Run unit tests
 	$(PYTHON) -m pytest tests/ -v

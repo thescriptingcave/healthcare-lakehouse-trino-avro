@@ -209,11 +209,16 @@ services:
       SUPERSET_WEBSERVER_PORT: 8088
       SUPERSET_WEBSERVER_TIMEOUT: 300
       SUPERSET_WEBSERVER_ROUTE_PREFIX: "/"
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_ADMIN_USERNAME:-admin}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:-admin}
+      SUPERSET_ADMIN_FIRSTNAME: ${SUPERSET_ADMIN_FIRSTNAME:-Admin}
+      SUPERSET_ADMIN_LASTNAME: ${SUPERSET_ADMIN_LASTNAME:-User}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL:-admin@superset.local}
     volumes:
       - ./superset_home:/app/superset_home
       - ./docker/requirements-local.txt:/app/requirements-local.txt
-    entrypoint: >
-      sh -c "pip install -r /app/requirements-local.txt && /usr/bin/run-server.sh"
+      - ./docker/superset-bootstrap.sh:/app/superset-bootstrap.sh:ro
+    entrypoint: ["/bin/bash", "/app/superset-bootstrap.sh"]
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
       interval: 15s

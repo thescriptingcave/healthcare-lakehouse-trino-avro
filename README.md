@@ -16,7 +16,7 @@ make setup
 
 # 1. Start the stack (10 services; wait ~30s for everything to go healthy)
 make up
-make check            # keep going once every line is [OK]
+make check            # keep going once the three required services show [OK]
 
 # 2. Load the 15 clinical tables into MySQL + apply the Kafka enrichment
 make seed
@@ -235,10 +235,20 @@ Open the Trino UI at http://localhost:8082 to run queries interactively.
 
 ### 6. Visualize in Superset
 
-1. Open http://localhost:8088
-2. Login with admin credentials (see .env)
-3. Add Trino as a database connection: `trino://trino@trino:8080/nessie`
-4. Create dashboards
+Superset connects to Trino and the dashboards are provisioned automatically:
+
+```bash
+make superset-setup
+# Or: uv run python scripts/setup_superset.py   (idempotent, safe to re-run)
+```
+
+The script creates the `Trino (Iceberg)` database connection
+(`trino://trino@trino:8080/nessie`), four datasets (patients, encounters,
+observations, high heart-rate archive), four example charts, and the
+`Healthcare Lakehouse` dashboard, then verifies each chart returns rows.
+
+Then open http://localhost:8088 and log in with the admin credentials from
+`.env` (default `admin`/`admin`).
 
 ## Available Make Targets
 
@@ -254,6 +264,7 @@ make produce-json   # Start JSON vitals producer (alternative, vitals topic)
 make docker-produce # Start Avro vitals producer against the compose stack
 make migrate       # MySQL -> Iceberg (AVRO) in Nessie/MinIO + parity check
 make validate      # Re-run the data parity check
+make superset-setup # Provision Superset dashboards (idempotent)
 make test          # Run unit tests
 make lint          # Run linter and formatter
 make clean         # Remove containers, volumes, and data
