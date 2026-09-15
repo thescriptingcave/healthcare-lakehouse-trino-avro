@@ -4,28 +4,29 @@ services:
     image: mysql:8.0
     container_name: db
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: healthcare
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-healthcare}
     volumes:
-      - ./mysql_data:/var/lib/mysql  
+      - ./mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3306:3306"
     networks:
       - trino-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   # 2. Project Nessie
   nessie:
-    image: ghcr.io/projectnessie/nessie:latest
+    image: ghcr.io/projectnessie/nessie:0.91.1
     container_name: nessie
     environment:
       QUARKUS_HTTP_PORT: 19120
     ports:
-      - "19120:19120"
+      - "127.0.0.1:19120:19120"
     networks:
       - trino-network
     healthcheck:
@@ -33,19 +34,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   # 3. MinIO (S3-compatible storage)
   minio:
-    image: minio/minio:RELEASE.2023-07-21T21-12-44Z
+    image: quay.io/minio/minio:RELEASE.2023-07-21T21-12-44Z
     container_name: minio
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     environment:
-      MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
     volumes:
-      - ./minio-data:/data  
+      - ./minio-data:/data
     command: server --console-address ":9001" /data
     networks:
       - trino-network
@@ -54,10 +56,11 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
 
   # Create Iceberg bucket (idempotent + waits for MinIO)
   createbuckets:
-    image: minio/mc
+    image: quay.io/minio/mc:RELEASE.2024-07-31T15-58-33Z
     container_name: createbuckets
     depends_on:
       minio:
@@ -66,7 +69,7 @@ services:
        - trino-network
     entrypoint: >
       /bin/sh -c "
-      until /usr/bin/mc alias set myminio http://minio:9000 minio minio123; do
+      until /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minio} ${MINIO_ROOT_PASSWORD:-minio123}; do
         echo 'Waiting for MinIO to accept connections...';
         sleep 2;
       done;
@@ -82,14 +85,21 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
     networks:
       - trino-network
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/2181' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: kafka
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     ports:
-      - "9092:9092"
+      - "127.0.0.1:9092:9092"
     networks:
       - trino-network
     environment:
@@ -105,6 +115,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+    restart: unless-stopped
 
   schema-registry:
     image: confluentinc/cp-schema-registry:7.4.0
@@ -113,79 +124,103 @@ services:
       kafka:
         condition: service_healthy
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     networks:
       - trino-network
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka:29092
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   # 5. Trino
   trino:
-    image: trinodb/trino:latest
+    image: trinodb/trino:468
     container_name: trino
     depends_on:
       kafka:
-        condition: service_healthy    
+        condition: service_healthy
       db:
         condition: service_healthy
       nessie:
         condition: service_healthy
       createbuckets:
         condition: service_completed_successfully
+    environment:
+      MYSQL_ROOT_USER: ${MYSQL_ROOT_USER:-root}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
+    entrypoint: ["/bin/bash", "-c"]
+    # Render catalog templates (catalog files are written from .env values at
+    # container start - see docker/trino-bootstrap.sh), then launch Trino.
+    command:
+      - /bin/bash /etc/trino/bootstrap.sh && exec /usr/lib/trino/bin/run-trino
     ports:
-      - "8082:8080"
+      - "127.0.0.1:8082:8080"
     volumes:
-      - ./trino/catalog:/etc/trino/catalog
-      - ./trino_kafka:/etc/trino/kafka
-
+      - ./trino/catalog-templates:/etc/trino/templates:ro
+      - ./docker/trino-bootstrap.sh:/etc/trino/bootstrap.sh:ro
     networks:
       - trino-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/v1/info"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   # Kafka UI
   redpanda-console:
-    image: docker.redpanda.com/redpandadata/console:latest
+    image: docker.redpanda.com/redpandadata/console:v2.7.0
     container_name: redpanda-console
     depends_on:
       kafka:
         condition: service_healthy
       schema-registry:
-        condition: service_started
+        condition: service_healthy
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     networks:
       - trino-network
-    links:
-      - kafka
-      - schema-registry  
     environment:
       KAFKA_BROKERS: "kafka:29092"
       KAFKA_SCHEMAREGISTRY_ENABLED: "true"
       KAFKA_SCHEMAREGISTRY_URLS: "http://schema-registry:8081"
+    restart: unless-stopped
 
   # 6. Superset (Visualization)
   superset:
-   image: apache/superset:3.1.0
-   container_name: superset
-   user: "root"
-   depends_on:
-    trino:
-      condition: service_started
-   ports:
-    - "8088:8088"
-   networks:
-    - trino-network
-   environment:
-    SUPERSET_SECRET_KEY: healthcare_2026_secret
-    SUPERSET_WEBSERVER_PORT: 8088
-    SUPERSET_WEBSERVER_TIMEOUT: 300
-    SUPERSET_WEBSERVER_ROUTE_PREFIX: "/"
-   volumes:
-     # Mount docker/requirements-local.txt
-    - ./superset_home:/app/superset_home
-    - ./docker/requirements-local.txt:/app/requirements-local.txt
-   entrypoint: >
-      sh -c "pip install -r /app/requirements-local.txt && /usr/bin/run-server.sh" 
+    image: apache/superset:3.1.0
+    container_name: superset
+    depends_on:
+      trino:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8088:8088"
+    networks:
+      - trino-network
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-healthcare_2026_secret}
+      SUPERSET_WEBSERVER_PORT: 8088
+      SUPERSET_WEBSERVER_TIMEOUT: 300
+      SUPERSET_WEBSERVER_ROUTE_PREFIX: "/"
+    volumes:
+      - ./superset_home:/app/superset_home
+      - ./docker/requirements-local.txt:/app/requirements-local.txt
+    entrypoint: >
+      sh -c "pip install -r /app/requirements-local.txt && /usr/bin/run-server.sh"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
 
 networks:
   trino-network:
