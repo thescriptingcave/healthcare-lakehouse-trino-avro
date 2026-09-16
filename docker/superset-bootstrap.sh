@@ -7,6 +7,10 @@ set -euo pipefail
 
 pip install -r /app/requirements-local.txt
 
+# Apply the vendored fix for Iceberg $partitions detection in the Trino
+# SQLAlchemy dialect (trino 0.339.0). Idempotent; safe on every start.
+python /app/patches/trino_iceberg_partitions.py
+
 # Idempotent: create-admin exits non-zero if the user already exists.
 superset fab create-admin \
   --username "${SUPERSET_ADMIN_USERNAME:-admin}" \

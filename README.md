@@ -422,6 +422,27 @@ lsof -i :3306 -i :9092 -i :8081 -i :8082 -i :19120
 - Add Trino connection in Superset: Settings > Data > Databases > + > Trino
 - Connection string: `trino://trino@trino:8080/nessie`
 
+### Superset SQL Lab errors: "Column 'record_count' cannot be resolved"
+
+- **Cause:** the bundled Trino SQLAlchemy driver (`trino==0.339.0`) mistakes the
+  aggregate columns of an *unpartitioned* Iceberg `$partitions` table
+  (`record_count`, `file_count`, `total_size`, `data`) for real partition
+  columns. Superset then auto-runs bogus preview queries like
+  `WHERE record_count = 80751`.
+- **Fix (automatic):** the Superset bootstrap applies a small vendored patch to
+  the dialect on every container start (see `docker/patches/trino_iceberg_partitions.py`).
+  If you still see the error, close SQL Lab tabs and hard-refresh so the stale
+  preview state is cleared.
+- To drop this workaround when upgrading the driver, keep
+  `docker/requirements-local.txt` in sync and remove the patch step from
+  `docker/superset-bootstrap.sh` once the upstream dialect is fixed.
+
+### Superset SQL Lab rejects INSERT/CREATE
+
+- The Trino database connection has DML disabled (`allow_dml = false`) on
+  purpose. Enable it (Settings > Databases, or `PUT /api/v1/database/<id>`) if
+  you need to run DDL/DML from SQL Lab.
+
 ## Security Notes
 
 - All credentials in this demo are for **local development only**

@@ -1,2 +1,2 @@
-sqlalchemy-trino
-trino
+trino==0.339.0
+sqlalchemy-trino==0.5.0
